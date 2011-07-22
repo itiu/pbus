@@ -1,0 +1,22 @@
+src\Worker.d
+src\Logger.d
+src\dzmq.d
+src\ppqueue.d
+src\libzmq_headers.d
+src\load_info.d
+src\tango\util\uuid\NamespaceGenV3.d
+src\tango\util\uuid\NamespaceGenV5.d
+src\tango\util\uuid\RandomGen.d
+src\tango\util\uuid\Uuid.d
+src\tango/core/BitManip.d
+src\tango/core/ByteSwap.d
+src\tango/core/Exception.d 
+src\tango/text/convert/Integer.d
+src\tango/util/digest/Digest.d
+src\tango/util/digest/Md4.d
+src\tango/util/digest/Md5.d
+src\tango/util/digest/MerkleDamgard.d
+src\tango/util/digest/Sha01.d
+src\tango/util/digest/Sha1.d 
+src\tango/math/random/Twister.d
+lib\libzmq.lib -O -inline -release -ofpbus.exe

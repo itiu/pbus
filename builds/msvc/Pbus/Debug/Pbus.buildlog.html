@@ -1,0 +1,56 @@
+<html><head><META HTTP-EQUIV="Content-Type" content="text/html">
+</head><body><pre>
+<table width=100% bgcolor=#CFCFE5><tr><td>
+	<font face=arial size=+3>Build Log</font>
+</table>
+<table width=100% bgcolor=#DFDFE5><tr><td><font face=arial size=+2>
+Building Debug\Pbus.exe
+</font></table>
+<table width=100% bgcolor=#EFEFE5><tr><td><font face=arial size=+1>
+Command Line
+</font></table>
+set PATH=C:\dmd2\windows\bin;C:\Program Files\Microsoft SDKs\Windows\v7.0A\\bin;%PATH%
+
+echo tango\core\BitManip.d &gt;Debug\Pbus.build.rsp
+echo tango\core\ByteSwap.d &gt;&gt;Debug\Pbus.build.rsp
+echo tango\core\Exception.d &gt;&gt;Debug\Pbus.build.rsp
+echo tango\math\random\Twister.d &gt;&gt;Debug\Pbus.build.rsp
+echo tango\text\convert\Integer.d &gt;&gt;Debug\Pbus.build.rsp
+echo tango\util\digest\Digest.d &gt;&gt;Debug\Pbus.build.rsp
+echo tango\util\digest\Md4.d &gt;&gt;Debug\Pbus.build.rsp
+echo tango\util\digest\Md5.d &gt;&gt;Debug\Pbus.build.rsp
+echo tango\util\digest\MerkleDamgard.d &gt;&gt;Debug\Pbus.build.rsp
+echo tango\util\digest\Sha01.d &gt;&gt;Debug\Pbus.build.rsp
+echo tango\util\digest\Sha1.d &gt;&gt;Debug\Pbus.build.rsp
+echo tango\util\uuid\NamespaceGenV3.d &gt;&gt;Debug\Pbus.build.rsp
+echo tango\util\uuid\NamespaceGenV5.d &gt;&gt;Debug\Pbus.build.rsp
+echo tango\util\uuid\RandomGen.d &gt;&gt;Debug\Pbus.build.rsp
+echo tango\util\uuid\Uuid.d &gt;&gt;Debug\Pbus.build.rsp
+echo dzmq.d &gt;&gt;Debug\Pbus.build.rsp
+echo libzmq_headers.d &gt;&gt;Debug\Pbus.build.rsp
+echo Logger.d &gt;&gt;Debug\Pbus.build.rsp
+echo ppqueue.d &gt;&gt;Debug\Pbus.build.rsp
+echo Worker.d &gt;&gt;Debug\Pbus.build.rsp
+
+dmd -g -debug -X -Xf&quot;Debug\Pbus.json&quot; -of&quot;Debug\Pbus.exe_cv&quot; -deps=&quot;Debug\Pbus.dep&quot; -map &quot;Debug\Pbus.map&quot; -L/NOMAP C:\work\Pbus\libs\libzmq.lib @Debug\Pbus.build.rsp
+if errorlevel 1 goto reportError
+if not exist &quot;Debug\Pbus.exe_cv&quot; (echo &quot;Debug\Pbus.exe_cv&quot; not created! &amp;&amp; goto reportError)
+echo Converting debug information...
+&quot;C:\Program Files\VisualD\cv2pdb\cv2pdb.exe&quot; -D2 &quot;Debug\Pbus.exe_cv&quot; &quot;Debug\Pbus.exe&quot;
+if errorlevel 1 goto reportError
+if not exist &quot;Debug\Pbus.exe&quot; (echo &quot;Debug\Pbus.exe&quot; not created! &amp;&amp; goto reportError)
+
+goto noError
+
+:reportError
+echo Building Debug\Pbus.exe failed!
+
+:noError
+<table width=100% bgcolor=#EFEFE5><tr><td><font face=arial size=+1>
+Output
+</font></table>
+std.stdarg is deprecated.  You should import core.vararg instead.
+std.date and std.dateparse have been scheduled for deprecation. Please use std.datetime instead.
+no Windows support for CLOCK_MONOTONIC
+Converting debug information...
+</body></html>

@@ -26,6 +26,9 @@ static this()
 	io_msg = new Logger("pbus", "io", "broker");
 }
 
+static string cmd = "msg:command";
+static string[] cmd__modify_db = ["put", "get_ticket", "remove"];
+
 static int PPP_INTERVAL_INIT = 1000; //  	Initial reconnect
 static int PPP_INTERVAL_MAX = 32000; // 	After exponential backoff
 static int PPP_WORK_INTERVAL_MAX = 10000; // максимально возможный период для обработки сообщения
@@ -65,12 +68,12 @@ void main(char[][] args)
 	backend = zsocket_new(ctx, soc_type.ZMQ_ROUTER);
 	zsocket_bind(backend, backend_point); //  For workers
 
-	Main m = new Main ();
-//	stat = new Statistic ();
-	
-    LoadInfoThread load_info_thread = new LoadInfoThread(&m.getStatistic);
-    load_info_thread.start();	
-	
+	Main m = new Main();
+	//	stat = new Statistic ();
+
+	LoadInfoThread load_info_thread = new LoadInfoThread(&m.getStatistic);
+	load_info_thread.start();
+
 	//  Send out heartbeats at regular intervals
 	ulong heartbeat_at = zclock_time() + PPP_HEARTBEAT_INTERVAL;
 
@@ -211,13 +214,13 @@ void main(char[][] args)
 						zmsg_add(result_to_client, result_frame);
 
 						zmsg_send(&result_to_client, frontend);
-						
-						m.stat.count_prepared_message ++;
-						
-//						sw.stop();
-//						worker.time_w_c = sw.peek().usecs;
-//						log.trace("time W->C: %d, C_>W: %d, total: %d", worker.time_c_w, worker.time_w_c,
-//								worker.time_w_c + worker.time_w_c);
+
+						m.stat.count_prepared_message++;
+
+						//						sw.stop();
+						//						worker.time_w_c = sw.peek().usecs;
+						//						log.trace("time W->C: %d, C_>W: %d, total: %d", worker.time_c_w, worker.time_w_c,
+						//								worker.time_w_c + worker.time_w_c);
 
 						//						io_msg.trace_io (false, client_address, data, data_size);
 
@@ -311,7 +314,7 @@ void main(char[][] args)
 					zframe_send(&worker.address, backend, ZFRAME_REUSE + ZFRAME_MORE);
 					zframe_send(&frame_heartbeat, backend, ZFRAME_REUSE);
 
-//					log.trace("send heartbeat to [%s]", worker.identity);
+					//					log.trace("send heartbeat to [%s]", worker.identity);
 
 					count_h++;
 				}
@@ -342,6 +345,82 @@ void main(char[][] args)
 
 Worker* task_to_worker(zframe_t* address, zframe_t* data, Main m)
 {
+	byte* data_b = zframe_data(data);
+	int data_b_size = zframe_size(data);
+
+	int qq = 0;
+	int i;
+	for(i = 0; i < data_b_size; i++)
+	{
+		if(*(data_b + i) == cmd[qq])
+		{
+			qq++;
+			if(qq >= cmd.length)
+				break;
+		} else
+			qq = 0;
+	}
+
+	if(qq >= cmd.length)
+	{
+		// нашли команду msg:command, считаем что именно за комманда
+		int s_pos = 0;
+
+		// пропустим символы до [:]
+		for(; i < data_b_size; i++)
+			if(*(data_b + i) == ':')
+			{
+				// пропустим символы до ["]
+				for(; i < data_b_size; i++)
+					if(*(data_b + i) == '"')
+					{
+						s_pos = i;
+
+						// до следующей [""] будет сама команда
+						for(i = s_pos + 1; i < data_b_size; i++)
+							if(*(data_b + i) == '"')
+							{
+								int e_pos = i + 1;
+
+								foreach(cmd; cmd__modify_db)
+								{
+									if(*(data_b + i) == cmd[0] && e_pos - s_pos == cmd.length)
+									{
+										// вероятно это нужная нам команда
+
+										int j = 1;
+										// сравним остальные символы
+										for(i = s_pos + 2; i < e_pos; i++)
+										{
+											if(cmd[j] != *(data_b + i))
+												break;
+											j++;
+										}
+
+										if(j == cmd.length)
+										{
+											printf("found command:");
+											for(i = s_pos; i < e_pos; i++)
+												printf("%c", *(data_b + i));
+											printf("\n");
+
+										}
+									}
+
+								}
+
+								break;
+							}
+
+						break;
+					}
+
+				break;
+			}
+
+		// найдена команда изменяющая базу данных, выполним ее для всех воркеров
+	}
+
 	// выбрать свободного воркера
 	Worker* worker = null;
 
@@ -377,8 +456,8 @@ Worker* task_to_worker(zframe_t* address, zframe_t* data, Main m)
 		zframe_send(&worker.address, backend, ZFRAME_REUSE + ZFRAME_MORE);
 		zframe_send(&worker.client_data, backend, ZFRAME_REUSE);
 
-		byte* data_b = zframe_data(worker.client_data);
-		int data_b_size = zframe_size(worker.client_data);
+		//		byte* data_b = zframe_data(worker.client_data);
+		//		int data_b_size = zframe_size(worker.client_data);
 
 		//			        sw.stop();
 		//			long tt = sw.peek().usecs;
@@ -391,7 +470,7 @@ Worker* task_to_worker(zframe_t* address, zframe_t* data, Main m)
 	} else
 	{
 		log.trace("нет доступных воркеров, отправим клиенту сообщение о повторении попытки");
-//		printf ("!");    
+		//		printf ("!");    
 
 		//	если свободных нет, ответить клиенту чтоб подождал и попробовал еще раз
 
@@ -404,7 +483,7 @@ Worker* task_to_worker(zframe_t* address, zframe_t* data, Main m)
 
 		zmsg_send(&result_to_client, frontend);
 
-		m.stat.count_waiting_message ++;
+		m.stat.count_waiting_message++;
 
 		//			        sw.stop();
 		//			long tt = sw.peek().usecs;
@@ -461,13 +540,12 @@ class Main
 
 	this()
 	{
-		this.stat = new Statistic ();
+		this.stat = new Statistic();
 	}
-	
-    Statistic getStatistic ()
-    {
-            return stat;
-    }    
-	
-}
 
+	Statistic getStatistic()
+	{
+		return stat;
+	}
+
+}

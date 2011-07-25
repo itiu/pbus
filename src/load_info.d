@@ -71,7 +71,7 @@ class LoadInfoThread: Thread
 					now.length = 19;
 					
             		auto writer = appender!string();
-			        formattedWrite(writer, "%s | prepared :%5d | delta prepared %4d | delta waiting %4d | waiting:%5d | idle time:%7d | work time:%6d", 
+			        formattedWrite(writer, "%s | prepared :%6d | Δ prepared :%4d | rejected :%4d | Δ rejected:%5d | idle time:%7d | work time:%6d", 
 			            now, stat.count_prepared_message, delta_count, stat.count_waiting_message, delta_waiting, 0, 0);
 					int d_delta_count = cast(int)((cast(float)writer.data.length / cast(float)6000) * delta_count + 1);
 					writeln(set_bar_color, writer.data[0..d_delta_count], set_all_attribute_off, writer.data[d_delta_count..$]);

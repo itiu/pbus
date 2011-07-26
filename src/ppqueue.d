@@ -374,23 +374,23 @@ Worker* task_to_worker(zframe_t* address, zframe_t* data, Main m)
 				for(; i < data_b_size; i++)
 					if(*(data_b + i) == '"')
 					{
-						s_pos = i;
+						s_pos = i + 1;
 
 						// до следующей [""] будет сама команда
-						for(i = s_pos + 1; i < data_b_size; i++)
+						for(i = s_pos; i < data_b_size; i++)
 							if(*(data_b + i) == '"')
 							{
-								int e_pos = i + 1;
+								int e_pos = i;
 
 								foreach(cmd; cmd__modify_db)
 								{
-									if(*(data_b + i) == cmd[0] && e_pos - s_pos == cmd.length)
+									if(*(data_b + s_pos) == cmd[0] && e_pos - s_pos == cmd.length)
 									{
 										// вероятно это нужная нам команда
 
 										int j = 1;
 										// сравним остальные символы
-										for(i = s_pos + 2; i < e_pos; i++)
+										for(i = s_pos + 1; i < e_pos; i++)
 										{
 											if(cmd[j] != *(data_b + i))
 												break;
@@ -399,11 +399,13 @@ Worker* task_to_worker(zframe_t* address, zframe_t* data, Main m)
 
 										if(j == cmd.length)
 										{
+											// найдена команда изменяющая базу данных, выполним ее для всех воркеров
+
 											printf("found command:");
 											for(i = s_pos; i < e_pos; i++)
 												printf("%c", *(data_b + i));
 											printf("\n");
-
+											break;	
 										}
 									}
 
@@ -418,7 +420,6 @@ Worker* task_to_worker(zframe_t* address, zframe_t* data, Main m)
 				break;
 			}
 
-		// найдена команда изменяющая базу данных, выполним ее для всех воркеров
 	}
 
 	// выбрать свободного воркера

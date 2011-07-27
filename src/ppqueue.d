@@ -343,11 +343,8 @@ void main(char[][] args)
 	return;
 }
 
-Worker* task_to_worker(zframe_t* address, zframe_t* data, Main m)
+bool check_db_update_command(byte* data_b, int data_b_size)
 {
-	byte* data_b = zframe_data(data);
-	int data_b_size = zframe_size(data);
-
 	int qq = 0;
 	int i;
 	for(i = 0; i < data_b_size; i++)
@@ -405,7 +402,7 @@ Worker* task_to_worker(zframe_t* address, zframe_t* data, Main m)
 											for(i = s_pos; i < e_pos; i++)
 												printf("%c", *(data_b + i));
 											printf("\n");
-											break;	
+											return true;
 										}
 									}
 
@@ -421,6 +418,17 @@ Worker* task_to_worker(zframe_t* address, zframe_t* data, Main m)
 			}
 
 	}
+	return false;
+}
+
+Worker* task_to_worker(zframe_t* address, zframe_t* data, Main m)
+{
+//	{
+//	byte* data_b = zframe_data(data);
+//	int data_b_size = zframe_size(data);
+
+//	bool is_update_command = check_db_update_command(data_b, data_b_size);
+//	}
 
 	// выбрать свободного воркера
 	Worker* worker = null;

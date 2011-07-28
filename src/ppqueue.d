@@ -154,6 +154,7 @@ void main(char[][] args)
 							worker = s_worker_new(address, id);
 							available_workers[id] = worker;
 							log.trace("W->Q register worker [%s]", id);
+							m.stat.registred_workers_count ++;
 						}
 					}
 
@@ -519,6 +520,7 @@ static void s_workers_purge(ref Worker*[string] workers, Main m)
 
 			count_expired++;
 			workers.remove(worker.identity);
+			m.stat.registred_workers_count --;
 
 			if(worker.client_data !is null)
 			{

@@ -37,6 +37,18 @@ static int ZMQ_POLL_MSEC = 1000; // http://www.zeromq.org/docs:3-0-upgrade
 
 static string PPP_HEARTBEAT = "H";
 static string PPP_READY = "R";
+
+// поведение:
+//	all - выполняет все операции
+//  writer - только операции записи
+//  reader - только операции чтения
+//  logger - ничего не выполняет а только логгирует операции, параметры logging не учитываются 		
+
+static string PPP_BEHAVIOR_ALL = "A";
+static string PPP_BEHAVIOR_WRITER = "W";
+static string PPP_BEHAVIOR_READER = "R";
+static string PPP_BEHAVIOR_LOGGER = "L";
+
 static string NOT_AVAILABLE_WORKERS = "NAW";
 
 void* frontend;
@@ -135,6 +147,7 @@ void main(char[][] args)
 			if(id !is null)
 			{
 				if(msg_size == 1)
+				// пришло сообщение от воркера о том что он готов или его HEARTBEAT
 				{
 					// найдем воркер по идентификатору в списке доступных // свободных воркеров
 					Worker** pp = (id in available_workers);
@@ -153,8 +166,7 @@ void main(char[][] args)
 							// или создадим новый
 							worker = s_worker_new(address, id);
 							available_workers[id] = worker;
-							log.trace("W->Q register worker [%s]", id);
-							m.stat.registred_workers_count ++;
+							m.stat.registred_workers_count++;
 						}
 					}
 
@@ -164,15 +176,24 @@ void main(char[][] args)
 						//											print_data_from_frame ("W -> Q data:", frame);
 
 						byte* data = zframe_data(frame);
-						if(memcmp(data, cast(char*) PPP_READY, 1) && memcmp(data, cast(char*) PPP_HEARTBEAT, 1))
+						if(*data == *(cast(byte*) PPP_READY) || *data == *(cast(byte*) PPP_HEARTBEAT))
 						{
-							log.trace("E: invalid message from worker [%s]", worker.identity);
-							zmsg_dump(msg);
-						} else
-						{
+							if(*data == *(cast(byte*) PPP_READY))
+							{
+								worker.behavior = *(data + 1);
+								if(!(worker.behavior == 'A' || worker.behavior == 'R' || worker.behavior == 'W' || worker.behavior == 'L'))
+									worker.behavior = 'A';
+
+								log.trace("W->Q register worker [%s] R%s", id, worker.behavior);
+							}
+
 							//					writeln ("W->Q R ", aaa, " ", worker.identity, " ", worker.expiry, " ", count_r);
 							worker.expiry = zclock_time() + PPP_HEARTBEAT_INTERVAL * PPP_HEARTBEAT_LIVENESS * 10_000;
 							count_r++;
+						} else
+						{
+							log.trace("E: invalid message from worker [%s]", worker.identity);
+							zmsg_dump(msg);
 						}
 					}
 					zmsg_destroy(&msg);
@@ -288,10 +309,11 @@ void main(char[][] args)
 		 log.trace ("Q->W H available_workers.length=%d, count_h=%d", available_workers.length, count_h);
 		 }
 		 */
-		//			log.trace ("count_in_pool=%d, tt=%d", count_in_pool, tt);
 		//		if (tt > 1_000_000)
 		if(now_time >= heartbeat_at)
 		{
+			log.trace ("count_in_pool=%d, tt=%d", count_in_pool, now_time - heartbeat_at);
+			
 			//			if (available_workers.values.length > 0)				
 			{
 				//								log.trace ("W->Q R available_workers.length=%d, bisy_workers=%d, count_r=%d, count_expired=%d ", available_workers.length, bisy_workers.length, count_r, count_expired);
@@ -333,6 +355,8 @@ void main(char[][] args)
 		//						log.trace ("time s_workers_purge: %d", tt);						
 		//		s_workers_purge(bisy_workers);		
 	}
+	
+	printf ("main loop is ended\n");
 
 	//  When we're done, clean up properly
 	foreach(worker; available_workers.values)
@@ -424,22 +448,40 @@ bool check_db_update_command(byte* data_b, int data_b_size)
 
 Worker* task_to_worker(zframe_t* address, zframe_t* data, Main m)
 {
-//	{
-//	byte* data_b = zframe_data(data);
-//	int data_b_size = zframe_size(data);
 
-//	bool is_update_command = check_db_update_command(data_b, data_b_size);
-//	}
+	byte* data_b = zframe_data(data);
+	int data_b_size = zframe_size(data);
+
+	bool is_update_command = check_db_update_command(data_b, data_b_size);
 
 	// выбрать свободного воркера
 	Worker* worker = null;
 
 	foreach(wrk; available_workers.values)
 	{
+		// здесь мы выбираем свободного воркера
+		// если пришла команда на изменение базы данных то 
+		// 		выбираем воркера с поведением WRITER
+		// 		если WRITER не нашлось, то берем первого свободного из списка
+		// если команда чтения, то отдадим любому воркеру кроме WRITER
+
 		if(wrk.isBisy == false)
 		{
-			worker = wrk;
-			break;
+			if(is_update_command == true)
+			{
+				if(wrk.behavior == 'W')
+				{
+					worker = wrk;
+					break;
+				}
+
+				if(worker is null)
+					worker = wrk;
+			} else if(wrk.behavior != 'W')
+			{
+				worker = wrk;
+				break;
+			}
 		}
 	}
 
@@ -520,7 +562,7 @@ static void s_workers_purge(ref Worker*[string] workers, Main m)
 
 			count_expired++;
 			workers.remove(worker.identity);
-			m.stat.registred_workers_count --;
+			m.stat.registred_workers_count--;
 
 			if(worker.client_data !is null)
 			{

@@ -53,7 +53,7 @@ class LoadInfoThread: Thread
 				int delta_count = stat.count_prepared_message - prev_count;
 				int delta_waiting = stat.count_waiting_message - prev_waiting_count;
 
-				if(delta_count > 0 || delta_waiting > 0)
+//				if(delta_count > 0 || delta_waiting > 0)
 				{
 //					int delta_idle_time = idle_time - prev_idle_time;
 //					prev_idle_time = idle_time;

@@ -18,6 +18,13 @@ struct Worker
 	bool isBisy = false;
 	long time_c_w = 0;
 	long time_w_c = 0;
+	
+	// поведение:
+	//	all (A) - выполняет все операции
+	//  writer (W) - только операции записи
+	//  reader (R) - только операции чтения
+	//  logger (L) - ничего не выполняет а только логгирует операции, параметры logging не учитываются 		
+	char behavior = 'A'; 
 };
 
 //  Construct new worker

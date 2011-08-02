@@ -43,7 +43,8 @@ class LoadInfoThread: Thread
 
 			int prev_count = 0;
 			int prev_waiting_count = 0;
-
+			float max_delta_count = 1000;
+			
 			while(!cinfo_exit)
 			{
 				sleep_time = 1;
@@ -53,7 +54,7 @@ class LoadInfoThread: Thread
 				int delta_count = stat.count_prepared_message - prev_count;
 				int delta_waiting = stat.count_waiting_message - prev_waiting_count;
 
-//				if(delta_count > 0 || delta_waiting > 0)
+				if(delta_count > 0 || delta_waiting > 0)
 				{
 //					int delta_idle_time = idle_time - prev_idle_time;
 //					prev_idle_time = idle_time;
@@ -65,9 +66,13 @@ class LoadInfoThread: Thread
 					now.length = 19;
 					
             		auto writer = appender!string();
-			        formattedWrite(writer, "%s | prepared :%6d | Δ prepared :%4d | rejected :%4d | Δ rejected:%5d | workers:%3d", 
-			            now, stat.count_prepared_message, delta_count, stat.count_waiting_message, delta_waiting, stat.registred_workers_count);
-					int d_delta_count = cast(int)((cast(float)writer.data.length / cast(float)6000) * delta_count + 1);
+			    	formattedWrite(writer, "%s | prepared :%6d | Δ prepared :%4d | rejected :%4d | Δ rejected:%5d | workers:%3d", 
+			        	now, stat.count_prepared_message, delta_count, stat.count_waiting_message, delta_waiting, stat.registred_workers_count);
+			            
+			        if (delta_count >= max_delta_count)
+			            max_delta_count = delta_count + 1000;
+			        	
+					int d_delta_count = cast(int)((cast(float)writer.data.length / max_delta_count) * delta_count + 1);
 					writeln(set_bar_color, writer.data[0..d_delta_count], set_all_attribute_off, writer.data[d_delta_count..$]);
 				}
 

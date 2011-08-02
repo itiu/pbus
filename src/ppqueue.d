@@ -114,7 +114,10 @@ void main(char[][] args)
 		int rc = zmq_poll(cast(zmq_pollitem_t*) items, available_workers.length ? 2 : 1,
 				PPP_HEARTBEAT_INTERVAL * 10 * ZMQ_POLL_MSEC);
 		if(rc == -1)
+		{
+			log.trace("main loop break, zmq_poll == -1");
 			break; //  Interrupted
+		}
 
 		//  Handle worker activity on backend
 		if(items[0].revents & io_multiplexing.ZMQ_POLLIN)
@@ -125,7 +128,10 @@ void main(char[][] args)
 			//  Use worker address for routing
 			zmsg_t* msg = zmsg_recv(backend);
 			if(!msg)
+			{
+				log.trace("main loop break, zmsg_recv == !msg");
 				break; //  Interrupted
+			}
 
 			//  Any sign of life from worker means it's ready
 			zframe_t* address = zmsg_unwrap(msg);
@@ -312,8 +318,8 @@ void main(char[][] args)
 		//		if (tt > 1_000_000)
 		if(now_time >= heartbeat_at)
 		{
-			log.trace ("count_in_pool=%d, tt=%d", count_in_pool, now_time - heartbeat_at);
-			
+//			log.trace("count_in_pool=%d, tt=%d", count_in_pool, now_time - heartbeat_at);
+
 			//			if (available_workers.values.length > 0)				
 			{
 				//								log.trace ("W->Q R available_workers.length=%d, bisy_workers=%d, count_r=%d, count_expired=%d ", available_workers.length, bisy_workers.length, count_r, count_expired);
@@ -355,8 +361,9 @@ void main(char[][] args)
 		//						log.trace ("time s_workers_purge: %d", tt);						
 		//		s_workers_purge(bisy_workers);		
 	}
-	
-	printf ("main loop is ended\n");
+
+	log.trace("main loop is ended");
+	printf("main loop is ended\n");
 
 	//  When we're done, clean up properly
 	foreach(worker; available_workers.values)

@@ -4,7 +4,7 @@ private import libzmq_headers;
 private import std.c.stdlib;
 private import std.c.string;
 //private import std.c.stdio;
-private import std.stdarg;
+private import core.stdc.stdarg;
 private import std.datetime;
 private import std.stdio;
 

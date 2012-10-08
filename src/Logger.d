@@ -2,7 +2,7 @@ module Logger;
 
 private import std.format;
 private import std.c.stdio;
-private import std.date;
+import std.datetime;
 
 import std.array: appender;
 
@@ -12,8 +12,19 @@ import std.c.linux.linux;
 
 byte trace_msg[1100];
 
+version (X86_64)
+{
+    alias long _time;
+}
+else
+{
+    alias int _time;
+}
+
+
 public class Logger
-{	
+{
+	private int count = 0;
 	private int prev_time = 0; 
 	private string trace_logfilename = "app";
 	private string ext = "log";
@@ -36,7 +47,8 @@ public class Logger
 
 	private void open_new_file ()
 	{
-		int tt = time(null);
+		count = 0;
+		_time tt = time(null);
 		tm* ptm = localtime(&tt);
 		int year = ptm.tm_year + 1900;
 		int month = ptm.tm_mon + 1;
@@ -47,7 +59,7 @@ public class Logger
 
 		auto writer = appender!string();
 
-		formattedWrite(writer, "%s_%04d-%02d-%02d_%02d_%02d_%02d.%s", trace_logfilename, year, month, day, hour, minute, second, ext);
+		formattedWrite(writer, "%s_%04d-%02d-%02d_%02d:%02d:%02d.%s", trace_logfilename, year, month, day, hour, minute, second, ext);
 
 		writer.put(cast(char) 0);
 		
@@ -60,8 +72,8 @@ public class Logger
 		ff = fopen(writer.data.ptr, "aw");
 	}
 	
-	void trace_io(bool io, string agent_addr, byte* data, int len)
-	{
+	void trace_io(bool io, byte* data, ulong len)
+	{		
 		string str_io;
 
 		if(io == true)
@@ -69,7 +81,7 @@ public class Logger
 		else
 			str_io = "OUTPUT";
 			
-		int tt = time(null);
+		_time tt = time(null);
 		tm* ptm = localtime(&tt);
 		int year = ptm.tm_year + 1900;
 		int month = ptm.tm_mon + 1;
@@ -77,20 +89,30 @@ public class Logger
 		int hour = ptm.tm_hour;
 		int minute = ptm.tm_min;
 		int second = ptm.tm_sec;
-		d_time now = getUTCtime();
-		int milliseconds = msFromTime(now);
+		auto now = Clock.currTime();
+		int usecs = now.fracSec.usecs;
 
-		if (prev_time > 0 && day != prev_time)
+		count ++;
+
+		if (prev_time > 0 && day != prev_time || count > 1_000_000)
 		{
 			open_new_file ();
 		}
 		
 		auto writer = appender!string();
 
-		formattedWrite(writer, "[%04d-%02d-%02d %02d:%02d:%02d.%03d]\n%s %s\n", year, month, day, hour, minute, second, milliseconds, str_io, agent_addr);
-		fwrite (cast(char*)writer.data , 1, writer.data.length , ff);
+		formattedWrite(writer, "[%04d-%02d-%02d %02d:%02d:%02d.%03d]\n%s\n", year, month, day, hour, minute, second, usecs, str_io);
+
+		fwrite (cast(char*)writer.data , 1 , writer.data.length , ff);
 		
-		fwrite (data , 1 , len - 1, ff);
+                version (X86_64)
+                {
+                    fwrite (data , 1 , len - 1, ff);
+                }
+                else
+                {
+                    fwrite (data , 1 , cast(uint)len - 1, ff);
+                }
 
 		fputc('\r', ff);
 		
@@ -101,7 +123,7 @@ public class Logger
 
 	string trace(Char, A...)(in Char[] fmt, A args)
 	{
-		int tt = time(null);
+		_time tt = time(null);
 		tm* ptm = localtime(&tt);
 		int year = ptm.tm_year + 1900;
 		int month = ptm.tm_mon + 1;
@@ -109,18 +131,23 @@ public class Logger
 		int hour = ptm.tm_hour;
 		int minute = ptm.tm_min;
 		int second = ptm.tm_sec;
-		d_time now = getUTCtime();
-		int milliseconds = msFromTime(now);
+		auto now = Clock.currTime();
+		int usecs = now.fracSec.usecs;
 
-		if (prev_time > 0 && day != prev_time)
+		count++;
+		if (prev_time > 0 && day != prev_time || count > 1_000_000)
 		{
 			open_new_file ();
 		}
 		
 		//	       StopWatch sw1; sw1.start();
 		auto writer = appender!string();
-		
-		formattedWrite(writer, "[%04d-%02d-%02d %02d:%02d:%02d.%03d] [%s] ", year, month, day, hour, minute, second, milliseconds, src);
+
+		if (src.length > 0)
+		    formattedWrite(writer, "[%04d-%02d-%02d %02d:%02d:%02d.%03d] [%s] ", year, month, day, hour, minute, second, usecs, src);
+		else
+		    formattedWrite(writer, "[%04d-%02d-%02d %02d:%02d:%02d.%03d] ", year, month, day, hour, minute, second, usecs);
+
 		formattedWrite(writer, fmt, args);
 		writer.put(cast(char) 0);
 

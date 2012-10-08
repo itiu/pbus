@@ -177,9 +177,8 @@ else version( LDC )
 }
 else
 {
-    public import std.intrinsic;
+    public import core.bitop;
 }
-
 
 /**
  *  Calculates the number of set bits in a 32-bit integer.

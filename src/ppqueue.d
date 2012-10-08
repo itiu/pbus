@@ -1,5 +1,7 @@
 module ppqueue;
 
+private import myversion;
+
 private import libzmq_headers;
 private import std.stdio;
 private import std.c.string;
@@ -62,8 +64,9 @@ Worker*[string] available_workers;
 
 void main(char[][] args)
 {
-	log.trace("start");
-
+        log.trace_log_and_console("\nPBUS %s.%s.%s\nSOURCE: commit=%s date=%s\n", myversion.major, myversion.minor, myversion.patch,
+                                                myversion.hash, myversion.date);
+                                                
 	string frontend_point = "tcp://*:5544";
 	string backend_point = "tcp://*:5566";
 

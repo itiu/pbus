@@ -1,3 +1,4 @@
+build/src/myversion.d
 build/src/Worker.d
 build/src/Logger.d
 build/src/dzmq.d

@@ -1,0 +1,14 @@
+build/src/dzmq.d
+build/src/libzmq_headers.d
+build/src/mq_client.d
+build/src/zmq_point_to_poin_client.d
+build/src/zmq_pp_broker_client.d
+build/src/librabbitmq_headers.d
+build/src/rabbitmq_client.d
+build/src/Log.d
+
+build/src/myversion.d
+build/src/Worker.d
+build/src/Logger.d
+build/src/ppqueue.d
+build/src/load_info.d

@@ -7,11 +7,6 @@ private import std.stdio;
 private import std.c.string;
 private import std.datetime;
 
-private import tango.util.uuid.NamespaceGenV5;
-private import tango.util.digest.Sha1;
-private import tango.util.uuid.RandomGen;
-private import tango.math.random.Twister;
-
 private import std.container;
 private import Logger;
 private import dzmq;
@@ -149,7 +144,7 @@ void main(char[][] args)
 				id = zframe_strdup(address);
 			}
 
-			int msg_size = zmsg_size(msg);
+			long msg_size = zmsg_size(msg);
 			//			printf ("W->Q msg_size=%d\n", msg_size);
 
 			//  Validate control message, or return reply to client
@@ -233,7 +228,7 @@ void main(char[][] args)
 						// это сообщение с результатом работы от воркера, исходное сообщение находится в worker.msg
 						zframe_t* result_frame = zmsg_last(msg);
 						byte* data = zframe_data(result_frame);
-						int data_size = zframe_size(result_frame);
+						long data_size = zframe_size(result_frame);
 
 						string client_address = zframe_strdup(worker.client_address);
 
@@ -287,7 +282,7 @@ void main(char[][] args)
 			if(!msg)
 				break; //  Interrupted
 
-			int msg_size = zmsg_size(msg);
+			long msg_size = zmsg_size(msg);
 
 			zframe_t* address = zmsg_unwrap(msg);
 			//						print_data_from_frame ("C -> Q addr:", address);
@@ -378,7 +373,7 @@ void main(char[][] args)
 	return;
 }
 
-bool check_db_update_command(byte* data_b, int data_b_size)
+bool check_db_update_command(byte* data_b, long data_b_size)
 {
 	int qq = 0;
 	int i;
@@ -460,7 +455,7 @@ Worker* task_to_worker(zframe_t* address, zframe_t* data, Main m)
 {
 
 	byte* data_b = zframe_data(data);
-	int data_b_size = zframe_size(data);
+	long data_b_size = zframe_size(data);
 
 	bool is_update_command = check_db_update_command(data_b, data_b_size);
 

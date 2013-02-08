@@ -2,14 +2,17 @@ module ppqueue;
 
 private import myversion;
 
-private import libzmq_headers;
 private import std.stdio;
+private import std.container;
 private import std.c.string;
 private import std.datetime;
 
-private import std.container;
+private import libzmq_header;
+private import libczmq_header;
+
+private import util;
+
 private import Logger;
-private import dzmq;
 private import Worker;
 
 private import load_info;
@@ -59,7 +62,7 @@ Worker*[string] available_workers;
 
 void main(char[][] args)
 {
-        log.trace_log_and_console("\nPBUS %s.%s.%s\nSOURCE: commit=%s date=%s\n", myversion.major, myversion.minor, myversion.patch,
+    log.trace_log_and_console("\nPBUS %s.%s.%s\nSOURCE: commit=%s date=%s\n", myversion.major, myversion.minor, myversion.patch,
                                                 myversion.hash, myversion.date);
                                                 
 	string frontend_point = "tcp://*:5544";
@@ -72,11 +75,11 @@ void main(char[][] args)
 
 	log.trace("bind frontend (client) : %s", frontend_point);
 	frontend = zsocket_new(ctx, soc_type.ZMQ_ROUTER);
-	zsocket_bind(frontend, frontend_point); //  For clients
+	zsocket_bind(frontend, cast(char*)frontend_point); //  For clients
 
 	log.trace("bind backend (workers) : %s", backend_point);
 	backend = zsocket_new(ctx, soc_type.ZMQ_ROUTER);
-	zsocket_bind(backend, backend_point); //  For workers
+	zsocket_bind(backend, cast(char*)backend_point); //  For workers
 
 	Main m = new Main();
 	//	stat = new Statistic ();
@@ -141,7 +144,7 @@ void main(char[][] args)
 			if(address !is null)
 			{
 				// this is READY or HEARTBEAT message from worker
-				id = zframe_strdup(address);
+				id = fromStringz (cast (char*)zframe_data(address));
 			}
 
 			long msg_size = zmsg_size(msg);
@@ -230,7 +233,7 @@ void main(char[][] args)
 						byte* data = zframe_data(result_frame);
 						long data_size = zframe_size(result_frame);
 
-						string client_address = zframe_strdup(worker.client_address);
+						string client_address = fromStringz (cast(char*)zframe_data(worker.client_address));
 
 						zmsg_t* result_to_client = zmsg_new();
 						zmsg_add(result_to_client, worker.client_address);

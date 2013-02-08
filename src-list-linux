@@ -1,5 +1,6 @@
-build/src/dzmq.d
-build/src/libzmq_headers.d
+build/src/util.d
+build/src/libzmq_header.d
+build/src/libczmq_header.d
 build/src/mq_client.d
 build/src/zmq_point_to_poin_client.d
 build/src/zmq_pp_broker_client.d

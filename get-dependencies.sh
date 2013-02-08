@@ -1,4 +1,4 @@
-mq_connector__hash=00ca3e8
+mq_connector__hash=3495453
 
 mq_connector__project_name=itiu-mq-connector
 

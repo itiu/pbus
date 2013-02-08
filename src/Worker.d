@@ -1,9 +1,8 @@
 module Worker;
 
-private import dzmq;
+private import libczmq_header;
 private import zmq_point_to_poin_client;
 private import zmq_pp_broker_client;
-private import rabbitmq_client;
 private import Logger;
 
 static int PPP_HEARTBEAT_LIVENESS = 5; //  	3-5 is reasonable

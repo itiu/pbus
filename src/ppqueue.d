@@ -7,6 +7,10 @@ private import std.container;
 private import std.c.string;
 private import std.datetime;
 
+import core.runtime;
+import std.process;
+import std.conv;
+
 private import libzmq_header;
 private import libczmq_header;
 
@@ -33,7 +37,7 @@ static int PPP_INTERVAL_INIT = 1000; //  	Initial reconnect
 static int PPP_INTERVAL_MAX = 32000; // 	After exponential backoff
 static int PPP_WORK_INTERVAL_MAX = 10000; // максимально возможный период для обработки сообщения
 
-static int ZMQ_POLL_MSEC = 1000; // http://www.zeromq.org/docs:3-0-upgrade
+static int ZMQ_POLL_MSEC = 1;
 
 static string PPP_HEARTBEAT = "H";
 static string PPP_READY = "R";
@@ -67,9 +71,6 @@ void main(char[][] args)
                                                 
 	string frontend_point = "tcp://*:5544";
 	string backend_point = "tcp://*:5566";
-
-	if(zmq_ver.ZMQ_VERSION_MAJOR == 3)
-		ZMQ_POLL_MSEC = 1;
 
 	zctx_t* ctx = zctx_new();
 
@@ -113,7 +114,7 @@ void main(char[][] args)
 
 		//  Poll frontend only if we have available workers
 		int rc = zmq_poll(cast(zmq_pollitem_t*) items, available_workers.length ? 2 : 1,
-				PPP_HEARTBEAT_INTERVAL * 10 * ZMQ_POLL_MSEC);
+				PPP_HEARTBEAT_INTERVAL * ZMQ_POLL_MSEC);
 		if(rc == -1)
 		{
 			log.trace("main loop break, zmq_poll == -1");
@@ -148,7 +149,7 @@ void main(char[][] args)
 			}
 
 			long msg_size = zmsg_size(msg);
-			//			printf ("W->Q msg_size=%d\n", msg_size);
+						printf ("W->Q msg_size=%d\n", msg_size);
 
 			//  Validate control message, or return reply to client
 			if(id !is null)
@@ -180,7 +181,7 @@ void main(char[][] args)
 					if(worker !is null)
 					{
 						zframe_t* frame = zmsg_last(msg);
-						//											print_data_from_frame ("W -> Q data:", frame);
+						writeln ("frame=", fromStringz (cast (char*)zframe_data(frame)));
 
 						byte* data = zframe_data(frame);
 						if(*data == *(cast(byte*) PPP_READY) || *data == *(cast(byte*) PPP_HEARTBEAT))
@@ -195,7 +196,7 @@ void main(char[][] args)
 							}
 
 							//					writeln ("W->Q R ", aaa, " ", worker.identity, " ", worker.expiry, " ", count_r);
-							worker.expiry = zclock_time() + PPP_HEARTBEAT_INTERVAL * PPP_HEARTBEAT_LIVENESS * 10_000;
+							worker.expiry = zclock_time() + PPP_HEARTBEAT_INTERVAL * PPP_HEARTBEAT_LIVENESS;
 							count_r++;
 						} else
 						{
@@ -269,7 +270,7 @@ void main(char[][] args)
 						//						bisy_workers.remove (worker.identity);
 						worker.isBisy = false;
 
-						worker.expiry = zclock_time() + PPP_HEARTBEAT_INTERVAL * PPP_HEARTBEAT_LIVENESS * 10_000;
+						worker.expiry = zclock_time() + PPP_HEARTBEAT_INTERVAL * PPP_HEARTBEAT_LIVENESS;
 					}
 				}
 			}
@@ -319,7 +320,7 @@ void main(char[][] args)
 		//		if (tt > 1_000_000)
 		if(now_time >= heartbeat_at)
 		{
-//			log.trace("count_in_pool=%d, tt=%d", count_in_pool, now_time - heartbeat_at);
+			log.trace("count_in_pool=%d, tt=%d", count_in_pool, now_time - heartbeat_at);
 
 			//			if (available_workers.values.length > 0)				
 			{
@@ -336,7 +337,7 @@ void main(char[][] args)
 
 			}
 
-			// отправим HEARTBEAT незанятым работой воркерам
+			// "отправим HEARTBEAT незанятым работой воркерам
 			foreach(worker; available_workers.values)
 			{
 				if(worker.isBisy == false)
@@ -344,19 +345,21 @@ void main(char[][] args)
 					zframe_send(&worker.address, backend, ZFRAME_REUSE + ZFRAME_MORE);
 					zframe_send(&frame_heartbeat, backend, ZFRAME_REUSE);
 
-					//					log.trace("send heartbeat to [%s]", worker.identity);
+					log.trace("send heartbeat to [%s]", worker.identity);
 
 					count_h++;
 				}
 			}
 
-			heartbeat_at = zclock_time() + PPP_HEARTBEAT_INTERVAL * 1000 * 10;
+			heartbeat_at = zclock_time() + PPP_HEARTBEAT_INTERVAL;
 		}
 
 		StopWatch sw;
 		sw.start();
 
+//		writeln ("s_workers_purge(available_workers, m)");
 		s_workers_purge(available_workers, m);
+		
 		sw.stop();
 		long tt = sw.peek().usecs;
 		//						log.trace ("time s_workers_purge: %d", tt);						
@@ -364,15 +367,20 @@ void main(char[][] args)
 	}
 
 	log.trace("main loop is ended");
-	printf("main loop is ended\n");
+	writeln("main loop is ended, main pid:", getpid());
 
 	//  When we're done, clean up properly
 	foreach(worker; available_workers.values)
 	{
 		s_worker_destroy(&worker);
 	}
+	zsocket_destroy (ctx, backend);
+	zsocket_destroy (ctx, frontend);
 
 	zctx_destroy(&ctx);
+	
+	system ("kill -kill " ~ text (getpid()));
+	 
 	return;
 }
 

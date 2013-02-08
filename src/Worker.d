@@ -6,7 +6,7 @@ private import zmq_pp_broker_client;
 private import Logger;
 
 static int PPP_HEARTBEAT_LIVENESS = 5; //  	3-5 is reasonable
-static long PPP_HEARTBEAT_INTERVAL = 1000; //  	msecs
+static long PPP_HEARTBEAT_INTERVAL = 1000 * 10; //  	msecs
 
 int count_expired = 0;
 

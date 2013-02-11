@@ -2,14 +2,15 @@ module ppqueue;
 
 private import myversion;
 
+private import core.runtime;
+
 private import std.stdio;
 private import std.container;
 private import std.c.string;
 private import std.datetime;
-
-import core.runtime;
-import std.process;
-import std.conv;
+private import std.process;
+private import std.conv;
+version (linux) import std.c.linux.linux;
 
 private import libzmq_header;
 private import libczmq_header;
@@ -23,6 +24,7 @@ private import load_info;
 
 Logger log;
 Logger io_msg;
+byte trace_msg[1000];
 
 static this()
 {
@@ -61,14 +63,26 @@ void* backend;
 //  List of available workers
 Worker*[string] available_workers;
 
-////  List of idle workers
-//Worker*[string] bisy_workers;
+//Called upon a signal from Linux
+extern (C) void sighandler(int sig) nothrow @system
+{
+        printf("signal %d caught...\n", sig);
+        try
+        {
+            system ("kill -kill " ~ text (getpid()));
+            //Runtime.terminate();
+        }
+        catch (Exception ex)
+        {
+        }
+}
+
 
 void main(char[][] args)
-{
-    log.trace_log_and_console("\nPBUS %s.%s.%s\nSOURCE: commit=%s date=%s\n", myversion.major, myversion.minor, myversion.patch,
-                                                myversion.hash, myversion.date);
-                                                
+{	
+	log.trace_log_and_console("\nPBUS %s.%s.%s\nSOURCE: commit=%s date=%s\n", myversion.major, myversion.minor, myversion.patch,
+			myversion.hash, myversion.date);
+
 	string frontend_point = "tcp://*:5544";
 	string backend_point = "tcp://*:5566";
 
@@ -76,11 +90,11 @@ void main(char[][] args)
 
 	log.trace("bind frontend (client) : %s", frontend_point);
 	frontend = zsocket_new(ctx, soc_type.ZMQ_ROUTER);
-	zsocket_bind(frontend, cast(char*)frontend_point); //  For clients
+	zsocket_bind(frontend, cast(char*) frontend_point); //  For clients
 
 	log.trace("bind backend (workers) : %s", backend_point);
 	backend = zsocket_new(ctx, soc_type.ZMQ_ROUTER);
-	zsocket_bind(backend, cast(char*)backend_point); //  For workers
+	zsocket_bind(backend, cast(char*) backend_point); //  For workers
 
 	Main m = new Main();
 	//	stat = new Statistic ();
@@ -97,6 +111,15 @@ void main(char[][] args)
 
 	zframe_t* frame_heartbeat = zframe_new(cast(char*) PPP_HEARTBEAT, 1);
 
+    version (linux)
+    {
+        // установим обработчик сигналов прерывания процесса
+        signal(SIGABRT, &sighandler);
+        signal(SIGTERM, &sighandler);
+        signal(SIGQUIT, &sighandler);
+        signal(SIGINT, &sighandler);
+    }
+	
 	while(1)
 	{
 		count_in_pool++;
@@ -113,12 +136,11 @@ void main(char[][] args)
 		items[1].revents = 0;
 
 		//  Poll frontend only if we have available workers
-		int rc = zmq_poll(cast(zmq_pollitem_t*) items, available_workers.length ? 2 : 1,
-				PPP_HEARTBEAT_INTERVAL * ZMQ_POLL_MSEC);
+		int rc = zmq_poll(cast(zmq_pollitem_t*) items, available_workers.length ? 2 : 1, PPP_HEARTBEAT_INTERVAL * ZMQ_POLL_MSEC);
 		if(rc == -1)
 		{
 			log.trace("main loop break, zmq_poll == -1");
-			break; //  Interrupted
+			//			break; //  Interrupted
 		}
 
 		//  Handle worker activity on backend
@@ -145,30 +167,34 @@ void main(char[][] args)
 			if(address !is null)
 			{
 				// this is READY or HEARTBEAT message from worker
-				id = fromStringz (cast (char*)zframe_data(address));
+				id = fromStringz(cast(char*) zframe_data(address), zframe_size(address));
 			}
 
 			long msg_size = zmsg_size(msg);
-						printf ("W->Q msg_size=%d\n", msg_size);
 
 			//  Validate control message, or return reply to client
 			if(id !is null)
 			{
 				if(msg_size == 1)
-				// пришло сообщение от воркера о том что он готов или его HEARTBEAT
 				{
-					// найдем воркер по идентификатору в списке доступных // свободных воркеров
+					if(trace_msg[1])
+						log.trace("пришло сообщение от воркера о том что он готов или его это ответ на HEARTBEAT");
+
+					if(trace_msg[2])
+						log.trace("найдем воркер по идентификатору [%s] в списке доступных свободных воркеров", id);
 					Worker** pp = (id in available_workers);
 
 					if(pp !is null)
 					{
+						if(trace_msg[3])
+							log.trace("воркер найден");
 						worker = *pp;
 						zframe_destroy(&address); //?		
 					} else
 					{
-						// проверим вдруг это пришел HEARTBEAT от воркера который сейчас занят
+						if(trace_msg[4])
+							log.trace("среди доступных воркер не найден, зарегестрируем как новый");
 						//						pp = (id in bisy_workers);
-
 						//						if (pp is null)
 						{
 							// или создадим новый
@@ -181,7 +207,6 @@ void main(char[][] args)
 					if(worker !is null)
 					{
 						zframe_t* frame = zmsg_last(msg);
-						writeln ("frame=", fromStringz (cast (char*)zframe_data(frame)));
 
 						byte* data = zframe_data(frame);
 						if(*data == *(cast(byte*) PPP_READY) || *data == *(cast(byte*) PPP_HEARTBEAT))
@@ -192,7 +217,8 @@ void main(char[][] args)
 								if(!(worker.behavior == 'A' || worker.behavior == 'R' || worker.behavior == 'W' || worker.behavior == 'L'))
 									worker.behavior = 'A';
 
-								log.trace("W->Q register worker [%s] R%s", id, worker.behavior);
+								if(trace_msg[5])
+									log.trace("W->Q register worker [%s] R%s", id, worker.behavior);
 							}
 
 							//					writeln ("W->Q R ", aaa, " ", worker.identity, " ", worker.expiry, " ", count_r);
@@ -200,7 +226,8 @@ void main(char[][] args)
 							count_r++;
 						} else
 						{
-							log.trace("E: invalid message from worker [%s]", worker.identity);
+							if(trace_msg[6])
+								log.trace("E: invalid message from worker [%s]", worker.identity);
 							zmsg_dump(msg);
 						}
 					}
@@ -218,12 +245,14 @@ void main(char[][] args)
 						worker = *pp;
 						if(worker.isBisy == false)
 						{
-							log.trace("пришел результат от воркера [%s], но таковой не числится занятым работой", id);
+							if(trace_msg[7])
+								log.trace("пришел результат от воркера [%s], но таковой не числится занятым работой", id);
 							worker = null;
 						}
 					} else
 					{
-						log.trace("пришел результат от воркера [%s], но таковой у нас не зарегистрирован", id);
+						if(trace_msg[8])
+							log.trace("пришел результат от воркера [%s], но таковой у нас не зарегистрирован", id);
 					}
 
 					if(worker !is null)
@@ -234,7 +263,8 @@ void main(char[][] args)
 						byte* data = zframe_data(result_frame);
 						long data_size = zframe_size(result_frame);
 
-						string client_address = fromStringz (cast(char*)zframe_data(worker.client_address));
+						string client_address = fromStringz(cast(char*) zframe_data(worker.client_address), zframe_size(
+								worker.client_address));
 
 						zmsg_t* result_to_client = zmsg_new();
 						zmsg_add(result_to_client, worker.client_address);
@@ -252,6 +282,7 @@ void main(char[][] args)
 						//						log.trace("time W->C: %d, C_>W: %d, total: %d", worker.time_c_w, worker.time_w_c,
 						//								worker.time_w_c + worker.time_w_c);
 
+						//						if (trace_msg[100]) 						
 						//						io_msg.trace_io (false, client_address, data, data_size);
 
 						zframe_destroy(&worker.client_data);
@@ -320,7 +351,8 @@ void main(char[][] args)
 		//		if (tt > 1_000_000)
 		if(now_time >= heartbeat_at)
 		{
-			log.trace("count_in_pool=%d, tt=%d", count_in_pool, now_time - heartbeat_at);
+			if(trace_msg[9])
+				log.trace("count_in_pool=%d, tt=%d", count_in_pool, now_time - heartbeat_at);
 
 			//			if (available_workers.values.length > 0)				
 			{
@@ -345,7 +377,8 @@ void main(char[][] args)
 					zframe_send(&worker.address, backend, ZFRAME_REUSE + ZFRAME_MORE);
 					zframe_send(&frame_heartbeat, backend, ZFRAME_REUSE);
 
-					log.trace("send heartbeat to [%s]", worker.identity);
+					if(trace_msg[10])
+						log.trace("send heartbeat to [%s]", worker.identity);
 
 					count_h++;
 				}
@@ -357,11 +390,11 @@ void main(char[][] args)
 		StopWatch sw;
 		sw.start();
 
-//		writeln ("s_workers_purge(available_workers, m)");
+		//		writeln ("s_workers_purge(available_workers, m)");
 		s_workers_purge(available_workers, m);
-		
+
 		sw.stop();
-		long tt = sw.peek().usecs;
+		// tt = sw.peek().usecs;
 		//						log.trace ("time s_workers_purge: %d", tt);						
 		//		s_workers_purge(bisy_workers);		
 	}
@@ -374,13 +407,13 @@ void main(char[][] args)
 	{
 		s_worker_destroy(&worker);
 	}
-	zsocket_destroy (ctx, backend);
-	zsocket_destroy (ctx, frontend);
+	zsocket_destroy(ctx, backend);
+	zsocket_destroy(ctx, frontend);
 
 	zctx_destroy(&ctx);
-	
-	system ("kill -kill " ~ text (getpid()));
-	 
+
+	system("kill -kill " ~ text(getpid()));
+
 	return;
 }
 
@@ -439,10 +472,10 @@ bool check_db_update_command(byte* data_b, long data_b_size)
 										{
 											// найдена команда изменяющая базу данных, выполним ее для всех воркеров
 
-											printf("found command:");
-											for(i = s_pos; i < e_pos; i++)
-												printf("%c", *(data_b + i));
-											printf("\n");
+											//											printf("found command:");
+											//											for(i = s_pos; i < e_pos; i++)
+											//												printf("%c", *(data_b + i));
+											//											printf("\n");
 											return true;
 										}
 									}

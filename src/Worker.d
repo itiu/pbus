@@ -5,8 +5,8 @@ private import zmq_point_to_poin_client;
 private import zmq_pp_broker_client;
 private import Logger;
 
-static int PPP_HEARTBEAT_LIVENESS = 5; //  	3-5 is reasonable
-static long PPP_HEARTBEAT_INTERVAL = 1000 * 10; //  	msecs
+const PPP_HEARTBEAT_LIVENESS = 5; //  	3-5 is reasonable
+const PPP_HEARTBEAT_INTERVAL = 1000 * 10; //  	msecs
 
 int count_expired = 0;
 
@@ -20,13 +20,13 @@ struct Worker
 	bool isBisy = false;
 	long time_c_w = 0;
 	long time_w_c = 0;
-	
+
 	// поведение:
 	//     all (A) - выполняет все операции
 	//  writer (W) - только операции записи
 	//  reader (R) - только операции чтения
 	//  logger (L) - ничего не выполняет а только логгирует операции, параметры logging не учитываются 		
-	char behavior = 'A'; 
+	char behavior = 'A';
 };
 
 //  Construct new worker
